@@ -8,10 +8,11 @@ import fs2.Stream
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.implicits._
 import org.http4s.server.middleware.{Logger => MiddlewareLgger}
+import scalatags.Text.TypedTag
 
 object WikiServer {
   def stream[F[_]: Async: Logger]: Stream[F, Nothing] = {
-    val wikiAlg = Wiki.impl[F]
+    val wikiAlg = Wiki.impl[F, TypedTag[String]]
     val httpApp = WikiRoutes.wikiRoutes[F](wikiAlg).orNotFound
 
     // add middleware
