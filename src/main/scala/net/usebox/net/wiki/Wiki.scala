@@ -7,24 +7,21 @@ import doobie._
 import doobie.implicits._
 import cats.effect._
 import cats.implicits._
-import scalatags.Text.TypedTag
 
-trait Wiki[F[_], R] {
-  type R = TypedTag[String]
-
+trait Wiki[F[_]] {
   def wikiHome: String
   def init: F[Unit]
-  def getPage(id: String): F[Option[R]]
-  def editPage(id: String): F[Option[R]]
+  def getPage(id: String): F[Option[Page]]
+  def editPage(id: String): F[Option[Page]]
   def savePage(id: String, body: String): F[Int]
-  def searchPage(query: String): F[R]
+  def searchPage(query: String): F[List[Page]]
 }
 
 object Wiki {
-  implicit def apply[F[_], R](implicit ev: Wiki[F, R]) = ev
+  implicit def apply[F[_]](implicit ev: Wiki[F]) = ev
 
-  def impl[F[_]: Async: Logger, R]: Wiki[F, R] =
-    new Wiki[F, R] {
+  def impl[F[_]: Async: Logger]: Wiki[F] =
+    new Wiki[F] {
       val wikiHome: String = "WikiHome"
 
       lazy val xa = Transactor.fromDriverManager[F](
@@ -41,19 +38,17 @@ object Wiki {
             .transact(xa)
             .onError(error => Logger[F].error(error)("Failed to init the DB"))
 
-      def getPage(id: String): F[Option[R]] =
+      def getPage(id: String): F[Option[Page]] =
         Logger[F].debug(s"getPage $id") >>
           WikiSql
             .getPage(id)
             .transact(xa)
-            .map(_.map(p => WikiTemplates.show(p)))
 
-      def editPage(id: String): F[Option[R]] =
+      def editPage(id: String): F[Option[Page]] =
         Logger[F].debug(s"editPage $id") >>
           WikiSql
             .getPage(id)
             .transact(xa)
-            .map(_.map(p => WikiTemplates.edit(p)))
 
       def savePage(id: String, body: String): F[Int] =
         Logger[F].debug(s"savePage $id") >>
@@ -66,15 +61,13 @@ object Wiki {
             )
           } yield updated).transact(xa)
 
-      def searchPage(query: String): F[R] =
+      def searchPage(query: String): F[List[Page]] =
         Logger[F].debug(s"searchPage $query") >>
           (if (query.isEmpty)
-             WikiTemplates.searchResults("", Nil).pure[F]
+             Sync[F].pure(Nil)
            else
              WikiSql
                .search(query)
-               .transact(xa)
-               .map(WikiTemplates.searchResults(query, _)))
-
+               .transact(xa))
     }
 }

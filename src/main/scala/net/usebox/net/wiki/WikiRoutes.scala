@@ -2,7 +2,6 @@ package net.usebox.net.wiki
 
 import cats.effect.Async
 import cats.implicits._
-import scalatags.Text
 import org.http4s._
 import org.http4s.headers.Location
 import org.http4s.dsl.Http4sDsl
@@ -11,7 +10,7 @@ import org.http4s.scalatags._
 object WikiRoutes {
 
   def wikiRoutes[F[_]: Async](
-      wiki: Wiki[F, Text.TypedTag[String]]
+      wiki: Wiki[F]
   ): HttpRoutes[F] = {
     val dsl = new Http4sDsl[F] {}
     import dsl._
@@ -27,7 +26,11 @@ object WikiRoutes {
           .decode[UrlForm] { data =>
             data.values.get("query").flatMap(_.uncons) match {
               case Some((query, _)) =>
-                wiki.searchPage(query).flatMap(Ok(_))
+                wiki
+                  .searchPage(query)
+                  .flatMap(found =>
+                    Ok(WikiTemplates.searchResults(query, found))
+                  )
               case None =>
                 BadRequest()
             }
@@ -36,12 +39,16 @@ object WikiRoutes {
       case GET -> Root =>
         wiki
           .getPage(wiki.wikiHome)
-          .flatMap(_.fold(NotFound())(Ok(_)))
+          .flatMap(_.fold(NotFound())(p => Ok(WikiTemplates.show(p))))
 
       case (GET | POST) -> Root / id =>
         wiki
           .getPage(id)
-          .flatMap(_.fold(NotFound(WikiTemplates.notFound(id)))(Ok(_)))
+          .flatMap(
+            _.fold(NotFound(WikiTemplates.notFound(id)))(p =>
+              Ok(WikiTemplates.show(p))
+            )
+          )
 
       case GET -> Root / id / "edit" =>
         wiki
@@ -49,7 +56,7 @@ object WikiRoutes {
           .flatMap(
             _.fold(
               NotFound(WikiTemplates.edit(Page(id, s"# $id\n")))
-            )(Ok(_))
+            )(p => Ok(WikiTemplates.edit(p)))
           )
 
       case req @ POST -> Root / id / "save" =>
