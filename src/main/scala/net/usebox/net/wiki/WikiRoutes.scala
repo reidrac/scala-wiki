@@ -63,7 +63,7 @@ object WikiRoutes {
                     if (updated != 1)
                       InternalServerError()
                     else
-                      // shoudl be using uri"/$id"; but currently the macro errors
+                      // should be using uri"/$id"; but currently the macro errors
                       TemporaryRedirect(
                         Location(new Uri(path = Path.unsafeFromString(s"/$id")))
                       )
