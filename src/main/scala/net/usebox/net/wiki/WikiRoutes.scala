@@ -41,7 +41,7 @@ object WikiRoutes {
           .getPage(wiki.wikiHome)
           .flatMap(_.fold(NotFound())(p => Ok(WikiTemplates.show(p))))
 
-      case (GET | POST) -> Root / id =>
+      case GET -> Root / id =>
         wiki
           .getPage(id)
           .flatMap(
@@ -70,7 +70,7 @@ object WikiRoutes {
                     if (updated != 1)
                       InternalServerError()
                     else
-                      TemporaryRedirect(
+                      SeeOther(
                         Location(new Uri(path = Path.unsafeFromString(s"/$id")))
                       )
                   }
